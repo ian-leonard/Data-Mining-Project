@@ -1,0 +1,195 @@
+---
+title: "DataMiningProject_EDA"
+author: "Ian Leonard"
+date: "2023-11-28"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(caret)
+```
+
+```{r}
+master <- read.csv("Master.csv")
+batting <- read.csv("Batting.csv")
+salaries <- read.csv("Salaries.csv")
+teams <- read.csv("Teams.csv")
+pitching <- read.csv("Pitching.csv")
+allstar <- read.csv("AllstarFull.csv")
+```
+
+Summaries of Interesting Cols
+
+Batting:
+ - 5149 NA's (0.05081317) in AB
+ - Mean: 150 ABs
+ 
+Salary:
+ - No entries for salary before 1985
+
+```{r}
+summary(batting$AB)
+# count of NA's in batting
+sum(is.na(batting$AB))
+nrow(batting)
+```
+All Stars
+```{r}
+summary(allstar$GP)
+
+```
+
+Important Cols: 
+ - PlayerID, YearID, 
+ 
+ 
+1. Predict All Star Appearances based on Batting Stats
+```{r}
+# merge allstar and batting
+
+# take 
+allstar_batting <- batting %>% 
+  left_join(allstar, by = c("playerID", "yearID"))
+
+summary(allstar_batting)
+# remove NA's
+
+allstar_batting <- na.omit(allstar_batting)
+```
+
+2. Predict Salary based on Batting Stats
+```{r}
+# create table with playerID, yearID, salary, batting stats
+batting_salary <- batting %>% 
+  left_join(salaries, by = c("playerID", "yearID"))
+
+#plot average salary by year
+#ggplot(batting_salary, aes(yearID, salary)) + geom_point() + geom_smooth(method = "lm")
+
+year_salary <- batting_salary %>% 
+  group_by(yearID) %>% 
+  summarise(mean_salary = mean(salary, na.rm = TRUE)) %>% 
+  filter(!yearID < 1985)
+
+ggplot(year_salary, aes(yearID, mean_salary)) + geom_point() + geom_smooth(method = "lm")
+```
+Model for predicting salary based on batting stats
+FOR YEAR 1985-1990
+
+Notes: 
+ - 1985-1990 has 1918/6310 = 0.304 NA's in salary
+```{r}
+
+batting_salary_80s <- batting_salary %>% 
+  filter(yearID >= 1985 & yearID <= 1990)
+sum(is.na(batting_salary_80s$salary))
+nrow(batting_salary_80s)
+
+```
+
+1990-2000
+NOTES:
+  - 2873/13373 = 0.2148359 NA's in salary
+```{r}
+batting_salary_90s <- batting_salary %>% 
+  filter(yearID >= 1990 & yearID <= 2000)
+sum(is.na(batting_salary_90s$salary))
+nrow(batting_salary_90s)
+
+
+
+```
+
+2000-2010
+Notes:
+  - 5116/14959 = 0.3420015 NA's in salary
+```{r}
+batting_salary_00s <- batting_salary %>% 
+  filter(yearID >= 2000 & yearID <= 2010)
+sum(is.na(batting_salary_00s$salary))
+nrow(batting_salary_00s)
+
+```
+
+2010-2015
+Notes:
+  - 3136/8485 = 0.3695934 NA's in salary
+
+```{r}
+batting_salary_10s <- batting_salary %>% 
+  filter(yearID >= 2010 & yearID <= 2015)
+sum(is.na(batting_salary_10s$salary))
+nrow(batting_salary_10s)
+
+```
+
+```{r}
+batting_salary_80s <- na.omit(batting_salary_80s)
+# create model
+batting_salary_80s_model <- lm(salary ~ G + AB + R + H + X2B + X3B + HR + RBI + SB + CS + BB + SO + IBB + HBP + SH + SF + GIDP, data = batting_salary_80s)
+summary(batting_salary_80s_model)
+```
+
+```{r}
+```
+
+3. Predict All Star Appearances based on Batting, Pitching, and Fielding Stats
+
+
+4. Predict Batting Average for 2015 based on stats from 2014
+Batting Average = H/AB
+```{r}
+# create table with playerID, yearID, salary, batting stats from 2014
+batting_2014 <- batting_salary %>% 
+  filter(yearID == 2014)
+# insert Batting Average
+batting_2014$BA <- batting_2014$H/batting_2014$AB
+
+batting_2015 <- batting_salary %>% 
+  filter(yearID == 2015)
+# insert Batting Average
+batting_2015$BA <- batting_2015$H/batting_2015$AB
+
+# create model
+batting_2014_model <- lm(BA ~ H+ G + AB + R + X2B + X3B + HR + RBI + SB + CS + BB + SO + IBB + HBP + SH + SF + GIDP, data = batting_2014)
+summary(batting_2014_model)
+```
+
+```{r}
+# Install and load the rpart package
+library(rpart)
+
+# Create a decision tree model
+batting_2014_tree <- rpart(BA ~ H + G + AB + R + X2B + X3B + HR + RBI + SB + CS + BB + SO + IBB + HBP + SH + SF + GIDP, data = batting_2014)
+
+# Print the decision tree
+print(batting_2014_tree)
+
+# Plot the decision tree
+plot(batting_2014_tree)
+text(batting_2014_tree, cex = 0.8)
+
+# Make predictions for 2015 using the model
+batting_2015_predictions <- predict(batting_2014_tree, newdata = batting_2015)  # Assuming you have a batting_2015 dataset
+
+# Add the predictions to your batting_2015 dataset
+batting_2015$Predicted_BA <- batting_2015_predictions
+
+# View the predictions
+batting_2015$Predicted_BA
+
+# View the actual batting averages
+batting_2015$BA
+
+# Calculate the mean squared error
+mean((batting_2015$BA - batting_2015$Predicted_BA)^2)
+```
+
+
+
