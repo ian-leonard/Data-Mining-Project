@@ -1,0 +1,228 @@
+---
+title: "542 project"
+author: "Jesse Long"
+date: "2023-11-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+master <- read.csv("Master.csv")
+batting <- read.csv("Batting.csv")
+salaries <- read.csv("Salaries.csv")
+teams <- read.csv("Teams.csv")
+pitching <- read.csv("Pitching.csv")
+allstar <- read.csv("AllstarFull.csv")
+
+
+
+library(tidyverse)
+library(car)
+library(ggplot2)
+library(caret)
+
+```
+
+
+```{r}
+library(dplyr)
+```
+
+
+Predicting Team Batting Average with linear regression
+
+
+Feature Engineering/Filtering
+```{r}
+
+teams<-teams %>% filter(yearID>=1980)
+nrow(teams)
+teams$AVG<- teams$H/teams$AB
+
+
+
+
+names(teams)
+#Taking out pitching info/unimportant columns
+teamspredicting<-teams[-c(3,4,6,7,8,10,11,12,13,14,16,17,25,26,28,29,33,34,35,36,37,38,41,42,44,46,47,48)]
+
+
+#Checking for missing values
+length(which(is.na(teamspredicting==TRUE)))
+teamspredicting[which(is.na(teamspredicting==TRUE)),]
+
+
+
+teamspredicting_clean <- na.omit(teamspredicting)
+
+
+head(teamspredicting_clean)
+```
+
+
+Model Building
+```{r}
+nTotal<- nrow(teamspredicting_clean)
+
+
+nTrain<-814#training data
+
+nTest<-204 #test data
+
+
+set.seed(542)
+train<-sample(nTotal, nTrain)
+
+model<-lm(AVG~., data<-teamspredicting_clean[train,]) #builds linear model just off training data
+
+
+
+summary(model)
+
+
+
+#Examining for multicolinearity
+vif(model)
+
+
+
+## testing
+pred<-predict(model, newdata<-teamspredicting_clean[-train,])# makes prediciton (applies model) on just testing data
+
+
+
+
+
+diff<-teamspredicting_clean$AVG[-train]-pred
+
+error<-sqrt(sum(diff**2)/nTest)
+
+cat(sprintf('nTrain=%d, nTest=%d, error=%f\n', nTrain, nTest, error))
+
+order(diff,decreasing=TRUE)
+
+max(diff)
+
+newdata$diff<- diff
+
+newdata$predictedAVG<- pred
+
+
+newdata[200,]
+
+
+extracted_rows <- teams[rownames(newdata), ]
+
+```
+
+Cross Validation 
+
+```{r}
+fit <- train(AVG ~ ., data=teamspredicting_clean, method='lm', trControl = trainControl(method='cv', number=10))
+fit
+
+
+```
+
+Plotting predicted AVG vs observed AVG for teams in Test Data
+
+```{r}
+
+newdata$Type <- rep("Observed", nrow(newdata))
+newdata$Type[which(!is.na(newdata$predictedAVG))] <- "Predicted"
+
+ggplot(newdata, aes(x=yearID)) +
+  geom_smooth(aes(y=AVG, color="Observed"), se=FALSE) +
+  geom_smooth(aes(y=predictedAVG, color="Predicted"), se=FALSE) +
+  labs(x="Year", y="Batting AVG", title="Predicted AVG vs Observed AVG") +
+  scale_color_manual(values=c("Observed"="red", "Predicted"="black")) +
+  theme(legend.title=element_blank()) # Optional: remove the legend title if desired
+
+
+
+```
+
+Biggest Misses on New Data
+
+```{r}
+
+extracted_rows <- teams[rownames(newdata), ]
+order(abs(diff),decreasing=TRUE)
+
+
+#2015 Tigers
+extracted_rows[200,]
+newdata[200,]
+
+#1994 Yankees
+extracted_rows[84,]
+newdata[84,]
+
+#1996 Chicago cubs
+extracted_rows[93,]
+newdata[93,]
+
+#2002 Marlins
+extracted_rows[129,]
+newdata[129,]
+
+#1991 New York Mets
+extracted_rows[65,]
+newdata[65,]
+```
+1. 2015 Detroit Tigers: Predicted avg (0.2540483) Observed avg(0.2702944)
+2. 1994 New York Yanks: Predicted avg (0.2760351) Observed avg(0.2897642)
+3. 1996 Chicago Cubs  : Predicted avg (0.2652034) Observed avg(0.2509492)
+4. 2002 FL Marlins    : Predicted avg (0.24683).  Observed avg(0.2607351)
+5. 1991 New York Mets : Predicted avg (0.2570462) Observed avg(0.2435156)
+
+
+
+
+
+
+
+Lab example
+```{r}
+model<-lm(Price~., data=auto)
+summary(model)
+#nothing predictive here. Just a descriptive model
+```
+
+```{r}
+nTrain<-1000 #training data
+nTest<-nTotal-nTrain #test data
+nTotal<-nrow(auto)
+
+nTrain<-1000 #training data
+nTest<-nTotal-nTrain #test data
+
+# random selection for training and testing data
+# optionally, fixing the seed value guarantees the same results in repeated runs
+set.seed(1)
+train<-sample(nTotal, nTrain) #randomly selects data. 1st argument is the data u want to select from. Second argument is how many values you want
+
+## training
+model<-lm(Price~., data<-auto[train,]) #builds linear model just off training data
+summary(model)
+
+## testing
+pred<-predict(model, newdata<-auto[-train,])# makes prediciton (applies model) on just testing data
+
+# evaluation with root mean square error
+diff<-auto$Price[-train]-pred
+error<-sqrt(sum(diff**2)/nTest)
+
+cat(sprintf('nTrain=%d, nTest=%d, error=%f\n', nTrain, nTest, error))
+
+vif(model)
+```
+
+
+
+
