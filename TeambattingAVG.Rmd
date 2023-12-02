@@ -44,12 +44,12 @@ teams<-teams %>% filter(yearID>=1980)
 nrow(teams)
 teams$AVG<- teams$H/teams$AB
 
-
+head(teams)
 
 
 names(teams)
 #Taking out pitching info/unimportant columns
-teamspredicting<-teams[-c(3,4,6,7,8,10,11,12,13,14,16,17,25,26,28,29,33,34,35,36,37,38,41,42,44,46,47,48)]
+teamspredicting<-teams[-c(3,4,6,7,8,10,11,12,13,14,16,17,25,26,28,33,34,35,36,37,38,41,42,44,46,47,48)]
 
 
 #Checking for missing values
@@ -70,13 +70,16 @@ Model Building
 nTotal<- nrow(teamspredicting_clean)
 
 
-nTrain<-814#training data
-
-nTest<-204 #test data
+nTrain<-712#training data
 
 
-set.seed(542)
+nTest<-306 #test data
+
+
+set.seed(541)
 train<-sample(nTotal, nTrain)
+
+
 
 model<-lm(AVG~., data<-teamspredicting_clean[train,]) #builds linear model just off training data
 
@@ -92,19 +95,20 @@ vif(model)
 
 
 ## testing
-pred<-predict(model, newdata<-teamspredicting_clean[-train,])# makes prediciton (applies model) on just testing data
-
-
-
+pred<-predict(model, newdata<-teamspredicting_clean[-train,])# makes prediction (applies model) on just testing data
 
 
 diff<-teamspredicting_clean$AVG[-train]-pred
+
+
 
 error<-sqrt(sum(diff**2)/nTest)
 
 cat(sprintf('nTrain=%d, nTest=%d, error=%f\n', nTrain, nTest, error))
 
+
 order(diff,decreasing=TRUE)
+
 
 max(diff)
 
@@ -112,8 +116,6 @@ newdata$diff<- diff
 
 newdata$predictedAVG<- pred
 
-
-newdata[200,]
 
 
 extracted_rows <- teams[rownames(newdata), ]
@@ -124,7 +126,6 @@ Cross Validation
 
 ```{r}
 fit <- train(AVG ~ ., data=teamspredicting_clean, method='lm', trControl = trainControl(method='cv', number=10))
-fit
 
 
 ```
@@ -155,34 +156,46 @@ extracted_rows <- teams[rownames(newdata), ]
 order(abs(diff),decreasing=TRUE)
 
 
-#2015 Tigers
-extracted_rows[200,]
-newdata[200,]
+#1994 Padres
+extracted_rows[114,]
+newdata[114,]
 
-#1994 Yankees
-extracted_rows[84,]
-newdata[84,]
+#1990 Mets
+extracted_rows[85,]
+newdata[85,]
 
-#1996 Chicago cubs
-extracted_rows[93,]
-newdata[93,]
+#1985 White Sox
+extracted_rows[34,]
+newdata[34,]
 
-#2002 Marlins
-extracted_rows[129,]
-newdata[129,]
+#1982 Oakland A's
+extracted_rows[14,]
+newdata[14,]
 
-#1991 New York Mets
-extracted_rows[65,]
-newdata[65,]
+#2002 Indians
+extracted_rows[180,]
+newdata[180,]
 ```
-1. 2015 Detroit Tigers: Predicted avg (0.2540483) Observed avg(0.2702944)
-2. 1994 New York Yanks: Predicted avg (0.2760351) Observed avg(0.2897642)
-3. 1996 Chicago Cubs  : Predicted avg (0.2652034) Observed avg(0.2509492)
-4. 2002 FL Marlins    : Predicted avg (0.24683).  Observed avg(0.2607351)
-5. 1991 New York Mets : Predicted avg (0.2570462) Observed avg(0.2435156)
+1. 1994 Padres: Observed AVG(0.2745821) Predicted AVG(0.2570354) Difference:0.0175467
+2. 1990 Mets:   Observed AVG(0.2533821) Predicted AVG(0.2698214) Difference:-0.01364408
+3. 1985 White Sox: Observed AVG(0.2533821) Predicted AVG(0.2665708) Difference:-0.01318867  
+4. 1982 A's:    Observed AVG(0.2360499) Predicted AVG(0.2491338) Difference:-0.01308389
+5. 2002 Indians:Observed AVG(0.2487553) Predicted AVG(0.2617859) Difference: -0.01303057
 
 
+```{r}
+summary(model)
+```
 
+Statistically Significant Predictors:
+Runs: More Runs -> Higher Batting Average
+HR:   Less Home Runs -> Higher Batting Average
+BB:   Less Walks -> Higher Batting Average
+SO: More Strike Outs -> Lower Batting
+SB: More Stolen Bases -> Lower Batting Average
+RA: More runs given up -> Lower Batting Average
+ERA: Higher ERA -> Higher Batting Average
+attendance: More fans -> Higher Batting Average
 
 
 
@@ -213,6 +226,7 @@ summary(model)
 
 ## testing
 pred<-predict(model, newdata<-auto[-train,])# makes prediciton (applies model) on just testing data
+
 
 # evaluation with root mean square error
 diff<-auto$Price[-train]-pred
