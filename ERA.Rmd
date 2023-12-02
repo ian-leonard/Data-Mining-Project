@@ -1,0 +1,252 @@
+---
+title: "ERA"
+author: "Will Kolbrener"
+date: "2023-12-02"
+output: pdf_document
+---
+
+Data Cleaning
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(caret)
+
+
+teams <- read.csv("Teams.csv")
+
+teams <- teams %>% filter(yearID >= 1980)
+
+Team_Full_Data <- teams
+
+teams$teamID <- NULL
+
+teams$ER <- NULL
+
+teams$HRA <- NULL
+
+teams$RA <- NULL
+
+teams$IPouts <- NULL
+
+teams$park <- NULL
+
+teams$HA <- NULL
+
+teams$DivWin <- NULL
+
+teams$WCWin <- NULL
+
+teams$LgWin <- NULL
+
+teams$WSWin <- NULL
+
+teams$teamID<- NULL
+
+teams$franchID <- NULL
+
+teams$names <- NULL
+
+teams$HBP <- NULL
+
+teams$SF <- NULL
+
+teams$name <- NULL
+
+teams$teamIDBR <- NULL
+
+teams$teamIDlahman45 <- NULL
+
+teams$teamIDretro <- NULL
+
+teams$Rank <- NULL
+
+teams$G <- NULL
+
+teams$L <- NULL
+
+teams$AB <- NULL
+
+teams$H <- NULL
+
+teams$HR <- NULL
+
+teams$BPF <- NULL 
+
+teams$G <- NULL 
+
+
+#NA Check
+length(which(is.na(teams==TRUE)))
+teams[which(is.na(teams==TRUE)),]
+
+
+Predic_ERA <- teams
+
+
+
+```
+
+
+Model Construction
+```{r}
+
+nTotal<- nrow(Predic_ERA)
+
+nTrain<-814
+
+nTest<-204
+
+
+set.seed(542)
+train<-sample(nTotal, nTrain)
+
+model<-lm(ERA~., data=Predic_ERA[train,]) #builds linear model just off training data
+
+
+summary(model)
+
+
+vif(model)
+
+
+
+## testing
+pred<-predict(model, newdata <-Predic_ERA[-train,])# makes prediction (applies model) on just 
+
+
+
+
+
+diff<-Predic_ERA$ERA[-train]-pred
+
+error<-sqrt(sum(diff**2)/nTest)
+
+cat(sprintf('nTrain=%d, nTest=%d, error=%f\n', nTrain, nTest, error))
+
+order(diff,decreasing=TRUE)
+
+max(diff)
+
+newdata$diff<- diff
+
+newdata$predictedERA<- pred
+
+
+newdata[200,]
+
+
+extracted_rows <- teams[rownames(newdata), ]
+
+
+```
+
+
+Cross Validation
+```{r}
+fit <- train(ERA ~ ., data=Predic_ERA, method='lm', trControl = trainControl(method='cv', number=10))
+fit
+```
+
+
+Predicted ERA vs Observed ERA
+```{r}
+
+newdata$Type <- rep("Observed", nrow(newdata))
+newdata$Type[which(!is.na(newdata$predictedERA))] <- "Predicted"
+
+ggplot(newdata, aes(x=yearID)) +
+  geom_smooth(aes(y=ERA, color="Observed"), se=FALSE) +
+  geom_smooth(aes(y=predictedERA, color="Predicted"), se=FALSE) +
+  labs(x="Year", y="ERA", title="Predicted ERA vs Observed ERA") +
+  scale_color_manual(values=c("Observed"="red", "Predicted"="black")) +
+  theme(legend.title=element_blank()) # Optional: remove the legend title if desired
+
+
+```
+
+
+
+Biggest Misses
+```{r}
+
+extracted_rows <- Team_Full_Data[rownames(newdata), ]
+order(abs(diff),decreasing=TRUE)
+
+#83, 104, 142, 124, 107
+
+#1994 Minnesota Twin
+extracted_rows[83,]
+newdata[83,]
+
+#1998 KC Royals
+extracted_rows[104,]
+newdata[104,]
+
+# 2005 Arizona Diamondbacks
+extracted_rows[142,]
+newdata[142,]
+
+
+# 2001 New York Mets
+extracted_rows[124,]
+newdata[124,]
+
+
+# 1998 Philadelphia Phillies
+extracted_rows[107,]
+newdata[107,]
+
+
+View(Team_Full_Data %>% filter(teamID == "NYN"))
+
+
+ggplot(Team_Full_Data,aes(x=R , y=ERA)) + geom_smooth()
+
+teamsw <- Team_Full_Data %>% filter(teamID =="PHI" & yearID==1998)
+median(teamsw$W)
+      
+```
+1. 1994 Minnesota Twins: Observed ERA: 5.68 Predicted ERA: 4.858362
+2. 1998 Kansas City Royals: Observed ERA: 5.16 Predicted ERA: 4.574792
+3. 2005 Arizona Diamondbacks: Observed ERA: 4.84 Predicted ERA:4.273108
+4. 2001 New York Mets: Observed ERA: 4.07 Predicted ERA: 3.505965
+5. 1998 Philadelphia Phillies: Observed ERA: 4.64 Predicted ERA: 4.175759
+
+
+
+Potential Reason for large miss of the 1994 MN Twins
+
+- Wins, Runs and Saves are all significant
+- 1994 MLB regular season ended 6 weeks early due to a players strike, this resulted in the Twins playing 49 less games than they have played in past years resulting in incomplete season statistics 
+-1993 Twins won 71 games where the 1994 Twins won 53
+-1993 Twins Recorded 44 saves and the 1994 Twins recorded 29 saves 
+-1993 Twins Scored 693 runs and the 1994 Twins scored 594
+
+
+Potential Reason for large miss of the 1998 KC Royals
+- Wins, Runs and Saves are all significant
+- Royals Record only 65 wins, the MLB median number of wins was 79.5. Teams with more wins tend to have lower ERAs 
+
+
+Potential Reason for large miss of the 2005 Diamondback
+- Ended the season 25th in Era (Had the 25th highest ERA in MLB)
+- Diamondbacks pitcher Brandon Webb won the Cy Young Award in 2005.
+-The average ERA of past Cy Young Winners is 2.48, Brandon Webb won the award with an ERA of 3.10
+- Diamondbacks hired a new manager at the start of the seaosn  
+
+
+Potential Reason for large miss of 2001 NY Mets
+- Had a large number of wins (82) but pitching staff preformed poorly
+- In 2000 the Mets scored 807 runs but in 2001 the Mets scored 642 runs, this large decrease in runs scored could have impacted this prediction
+- Mets had many home games rescheduled due to the September 11th Attack 
+
+
+Potential Reason for large miss of the 1998 Philadelphia Phillies
+ - First year in new ball park, which is extremely hitters friendly
+ - Team had many offensive stars such as Scott Rolen 
+ - Star pitchers such as Curt Schillings had a poor preformences in the new park 
+
+
