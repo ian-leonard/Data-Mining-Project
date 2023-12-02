@@ -30,9 +30,12 @@ postbatting <- read.csv("Battingpost.csv")
 ```{r}
 # Filter data from 2000 on, adding Run_Diff
 teams2 <- teams %>% 
-  filter(yearID > 2000) %>% 
+  filter(yearID > 1980) %>% 
   mutate(Run_Diff = R - RA,
          AVG = H/AB)
+
+# Copy of teams2 
+teams2.copy <- teams2
 
 # Get rid of high level/unneeded rows
 teams2 <- teams2[,-c(1:7,10:15,28,29,33,41,42,46:48)]
@@ -63,5 +66,46 @@ mse <- mean((test_data$W - predicted_values)^2); mse # Mean Square Error
 sqrt(mse) #RMSE
 r_squared <- 1 - sum((test_data$W - predicted_values)^2) / sum((test_data$W - mean(test_data$W))^2)
 r_squared #on test data
+
+head(sort(abs(Wins_Model2$residuals), decreasing = T),5)
+train_data[c(342,748,971,363,746),]
 ```
 
+```{r}
+diff<-teams2$W[-train_rows]-predicted_values
+
+error<-sqrt(sum(diff**2)/(nrow(test_data)))
+
+order(diff,decreasing=TRUE)
+
+max(diff)
+
+test_data$diff<- diff
+
+test_data$predictedW<- predicted_values
+
+extracted_rows <- teams2.copy[rownames(test_data), ]
+order(abs(diff),decreasing=TRUE) #115,79,44,123,106 (68 technically the 5th highest but it was in a shortened season)
+
+#2003 Giants (Actual:100, Predicted:89)
+extracted_rows[115,]
+test_data[115,]
+
+#1997 Yankees (Actual:96, Predicted:105)
+extracted_rows[79,]
+test_data[79,]
+
+#1989 Blue Jays (Actual:89, Predicted:80)
+extracted_rows[44,]
+test_data[44,]
+
+#2004 As (Actual:91, Predicted:82)
+extracted_rows[123,]
+test_data[123,]
+
+#2002 As (Actual:103, Predicted:95)
+extracted_rows[106,]
+test_data[106,]
+```
+
+,
