@@ -1,0 +1,67 @@
+---
+title: "Wins Models"
+author: "DJ Fugate"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(stats)
+```
+
+# Load in csvs
+
+```{r}
+master <- read.csv("Master.csv")
+batting <- read.csv("Batting.csv")
+salaries <- read.csv("Salaries.csv")
+teams <- read.csv("Teams.csv")
+pitching <- read.csv("Pitching.csv")
+allstar <- read.csv("AllstarFull.csv")
+postbatting <- read.csv("Battingpost.csv")
+```
+
+# Teams Data
+
+```{r}
+# Filter data from 2000 on, adding Run_Diff
+teams2 <- teams %>% 
+  filter(yearID > 2000) %>% 
+  mutate(Run_Diff = R - RA,
+         AVG = H/AB)
+
+# Get rid of high level/unneeded rows
+teams2 <- teams2[,-c(1:7,10:15,28,29,33,41,42,46:48)]
+
+# Get train and test data
+train_rows <- sample(1:nrow(teams2), .8 * nrow(teams2))
+train_data <- teams2[train_rows,]
+test_data <- teams2[-train_rows,]
+
+# Team Wins Model with all of variables
+Wins_Model <- lm(W~.,data = train_data)
+summary(Wins_Model)
+
+# Team Wins Model 1 statistics
+predicted_values <- predict(Wins_Model, test_data)
+mse <- mean((test_data$W - predicted_values)^2); mse # Mean Square Error
+rmse <- sqrt(mse); rmse   # RMSE
+r_squared <- 1 - sum((test_data$W - predicted_values)^2) / sum((test_data$W - mean(test_data$W))^2)
+r_squared # on test data
+
+# Team Wins Model using significant variables from first model
+Wins_Model2 <- lm(W~BB+CG+SV+HRA+BBA+SOA+Run_Diff, data=train_data)
+summary(Wins_Model2)
+
+# Teams Wins Model 2 statistics
+predicted_values <- predict(Wins_Model2, test_data)
+mse <- mean((test_data$W - predicted_values)^2); mse # Mean Square Error
+sqrt(mse) #RMSE
+r_squared <- 1 - sum((test_data$W - predicted_values)^2) / sum((test_data$W - mean(test_data$W))^2)
+r_squared #on test data
+```
+
