@@ -11,20 +11,17 @@ library(dplyr)
 library(ggplot2)
 library(caret)
 library(stats)
+library(car)
 ```
 
-# Load in csvs
+# Load in Team CSV
 
 ```{r}
-master <- read.csv("Master.csv")
-batting <- read.csv("Batting.csv")
-salaries <- read.csv("Salaries.csv")
 teams <- read.csv("Teams.csv")
-pitching <- read.csv("Pitching.csv")
-allstar <- read.csv("AllstarFull.csv")
-postbatting <- read.csv("Battingpost.csv")
-set.seed(545)
+
+set.seed(546)
 ```
+
 
 # Teams Data
 
@@ -33,13 +30,15 @@ set.seed(545)
 teams2 <- teams %>% 
   filter(yearID > 1980) %>% 
   mutate(Run_Diff = R - RA,
-         AVG = H/AB)
+         AVG = H/AB,
+         SLUG = ((H-X2B-X3B-HR)+(2*X2B)+(3*X3B)+(4*HR))/AB) %>% 
+  select(-c(HBP,SF))
 
 # Copy of teams2 
 teams2.copy <- teams2
 
 # Get rid of high level/unneeded rows
-teams2 <- teams2[,-c(1:7,10:15,28,29,33,41,42,46:48)]
+teams2 <- teams2[,-c(1:7,10:20,25:26,31,36,39:40,44:46)]
 
 # Get train and test data
 train_rows <- sample(1:nrow(teams2), .8 * nrow(teams2))
@@ -58,14 +57,18 @@ r_squared <- 1 - sum((test_data$W - predicted_values)^2) / sum((test_data$W - me
 r_squared # on test data
 
 # Team Wins Model using significant variables from first model
-Wins_Model2 <- lm(W~X3B+HR+BB+CG+SHO+SV+HRA+SOA+Run_Diff, data=train_data)
+Wins_Model2 <- lm(W~Ghome+BB+ERA+CG+SHO+SV+HA+SOA+FP+attendance+Run_Diff+SLUG, data=train_data)
 summary(Wins_Model2)
 
 # Teams Wins Model 2 statistics
 predicted_values <- predict(Wins_Model2, test_data)
+mse <- mean((test_data$W - predicted_values)^2); mse # Mean Square Error
+rmse <- sqrt(mse); rmse   # RMSE
 r_squared <- 1 - sum((test_data$W - predicted_values)^2) / sum((test_data$W - mean(test_data$W))^2)
 r_squared #on test data
 ```
+
+# Seeing top 5 misses of Model
 
 ```{r}
 diff<-teams2$W[-train_rows]-predicted_values
@@ -81,26 +84,40 @@ test_data$diff<- diff
 test_data$predictedW<- predicted_values
 
 extracted_rows <- teams2.copy[rownames(test_data), ]
-order(abs(diff),decreasing=TRUE) #185,101,169,132,121
+order(abs(diff),decreasing=TRUE) #129,117,51,92,67
 
-#2013 Phillies (Actual:73, Predicted:63)
-extracted_rows[185,]
-test_data[185,]
+#2003 Giants (Actual:100, Predicted:91)
+extracted_rows[129,]
+test_data[129,]
 
-#2000 Cubs (Actual:65, Predicted:74)
-extracted_rows[101,]
-test_data[101,]
+#2002 Red Sox (Actual:93, Predicted:101)
+extracted_rows[117,]
+test_data[117,]
 
-#2011 Indians (Actual:80, Predicted:70)
-extracted_rows[169,]
-test_data[169,]
+#1989 Astros (Actual:86, Predicted:77)
+extracted_rows[51,]
+test_data[51,]
 
-#2004 As (Actual:91, Predicted:82)
-extracted_rows[132,]
-test_data[132,]
+#1997 Giants (Actual:90, Predicted:81)
+extracted_rows[92,]
+test_data[92,]
 
-#2002 Cardinals (Actual:97, Predicted:87)
-extracted_rows[121,]
-test_data[121,]
+#1993 Mets (Actual:59, Predicted:66)
+extracted_rows[67,]
+test_data[67,]
 ```
+
+```{r}
+test_data$yearID <- extracted_rows$yearID
+
+
+ggplot(test_data, aes(x=yearID)) +
+  geom_smooth(aes(y=W, color="Observed"), se=FALSE) +
+  geom_smooth(aes(y=predictedW, color="Predicted"), se=FALSE) +
+  labs(x="Year", y="Wins", title="Predicted W vs Observed W",
+       caption = '') +
+  scale_color_manual(values=c("Observed"="red", "Predicted"="black")) +
+  theme(legend.title=element_blank()) # Optional: remove the legend title if desired
+```
+
 
