@@ -23,6 +23,7 @@ teams <- read.csv("Teams.csv")
 pitching <- read.csv("Pitching.csv")
 allstar <- read.csv("AllstarFull.csv")
 postbatting <- read.csv("Battingpost.csv")
+set.seed(545)
 ```
 
 # Teams Data
@@ -57,18 +58,13 @@ r_squared <- 1 - sum((test_data$W - predicted_values)^2) / sum((test_data$W - me
 r_squared # on test data
 
 # Team Wins Model using significant variables from first model
-Wins_Model2 <- lm(W~BB+CG+SV+HRA+BBA+SOA+Run_Diff, data=train_data)
+Wins_Model2 <- lm(W~X3B+HR+BB+CG+SHO+SV+HRA+SOA+Run_Diff, data=train_data)
 summary(Wins_Model2)
 
 # Teams Wins Model 2 statistics
 predicted_values <- predict(Wins_Model2, test_data)
-mse <- mean((test_data$W - predicted_values)^2); mse # Mean Square Error
-sqrt(mse) #RMSE
 r_squared <- 1 - sum((test_data$W - predicted_values)^2) / sum((test_data$W - mean(test_data$W))^2)
 r_squared #on test data
-
-head(sort(abs(Wins_Model2$residuals), decreasing = T),5)
-train_data[c(342,748,971,363,746),]
 ```
 
 ```{r}
@@ -85,27 +81,26 @@ test_data$diff<- diff
 test_data$predictedW<- predicted_values
 
 extracted_rows <- teams2.copy[rownames(test_data), ]
-order(abs(diff),decreasing=TRUE) #115,79,44,123,106 (68 technically the 5th highest but it was in a shortened season)
+order(abs(diff),decreasing=TRUE) #185,101,169,132,121
 
-#2003 Giants (Actual:100, Predicted:89)
-extracted_rows[115,]
-test_data[115,]
+#2013 Phillies (Actual:73, Predicted:63)
+extracted_rows[185,]
+test_data[185,]
 
-#1997 Yankees (Actual:96, Predicted:105)
-extracted_rows[79,]
-test_data[79,]
+#2000 Cubs (Actual:65, Predicted:74)
+extracted_rows[101,]
+test_data[101,]
 
-#1989 Blue Jays (Actual:89, Predicted:80)
-extracted_rows[44,]
-test_data[44,]
+#2011 Indians (Actual:80, Predicted:70)
+extracted_rows[169,]
+test_data[169,]
 
 #2004 As (Actual:91, Predicted:82)
-extracted_rows[123,]
-test_data[123,]
+extracted_rows[132,]
+test_data[132,]
 
-#2002 As (Actual:103, Predicted:95)
-extracted_rows[106,]
-test_data[106,]
+#2002 Cardinals (Actual:97, Predicted:87)
+extracted_rows[121,]
+test_data[121,]
 ```
 
-,
