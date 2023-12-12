@@ -25,6 +25,7 @@ library(tidyverse)
 library(car)
 library(ggplot2)
 library(caret)
+library(randomForest)
 
 ```
 
@@ -49,12 +50,13 @@ head(teams)
 
 names(teams)
 #Taking out pitching info/unimportant columns
-teamspredicting<-teams[-c(3,4,6,7,8,10,11,12,13,14,16,17,25,26,28,33,34,35,36,37,38,41,42,44,46,47,48)]
+teamspredicting<-teams[-c(3,4,6,7,8,10,11,12,13,14,16,17,25,26,28,33,34,35,36,37,38,41,42,45,46,47,48)]
 
 
 #Checking for missing values
 length(which(is.na(teamspredicting==TRUE)))
 teamspredicting[which(is.na(teamspredicting==TRUE)),]
+
 
 
 
@@ -65,38 +67,48 @@ head(teamspredicting_clean)
 ```
 
 
-Model Building
+Cross Validation Linear Regression
+
 ```{r}
-nTotal<- nrow(teamspredicting_clean)
+#fit <- train(AVG ~ ., data=teamspredicting_clean, method='lm', trControl = trainControl(method='cv', number=5))
+
+#summary(fit)
 
 
-nTrain<-712#training data
+set.seed(541)  # Set a seed for reproducibility
+
+# Determine the number of rows for the training set
+
+nTotal <- nrow(teamspredicting_clean)
+nTrain <- 712
+nTest<-nTotal-nTrain
+# Generate random indices for the training set
+train <- sample(nTotal, nTrain)
+
+# Create the training set and test set based on the indices
+trainData <- teamspredicting_clean[train, ]
+testData <- teamspredicting_clean[-train, ]
 
 
-nTest<-306 #test data
+ctrl <- trainControl(
+  method = "cv",    # Cross-validation method ("cv" for k-fold)
+  number = 10,       # Number of folds
+  verboseIter = TRUE # Show progress during training
+)
 
 
-set.seed(541)
-train<-sample(nTotal, nTrain)
+model <- train(
+  AVG ~ .,             # Formula for your model
+  data = trainData,  # Training data
+  method = "lm",    # Random Forest method
+  trControl = ctrl  # Cross-validation control
+)
 
 
-
-model<-lm(AVG~., data<-teamspredicting_clean[train,]) #builds linear model just off training data
-
+print(model)
 
 
-summary(model)
-
-
-
-#Examining for multicolinearity
-vif(model)
-
-
-
-## testing
-pred<-predict(model, newdata<-teamspredicting_clean[-train,])# makes prediction (applies model) on just testing data
-
+pred <- predict(model, newdata = testData)
 
 diff<-teamspredicting_clean$AVG[-train]-pred
 
@@ -107,10 +119,8 @@ error<-sqrt(sum(diff**2)/nTest)
 cat(sprintf('nTrain=%d, nTest=%d, error=%f\n', nTrain, nTest, error))
 
 
-order(diff,decreasing=TRUE)
+order(abs(diff),decreasing=TRUE)
 
-
-max(diff)
 
 newdata$diff<- diff
 
@@ -119,14 +129,6 @@ newdata$predictedAVG<- pred
 
 
 extracted_rows <- teams[rownames(newdata), ]
-
-```
-
-Cross Validation 
-
-```{r}
-fit <- train(AVG ~ ., data=teamspredicting_clean, method='lm', trControl = trainControl(method='cv', number=10))
-
 
 ```
 
@@ -177,7 +179,7 @@ extracted_rows[180,]
 newdata[180,]
 ```
 1. 1994 Padres: Observed AVG(0.2745821) Predicted AVG(0.2570354) Difference:0.0175467
-2. 1990 Mets:   Observed AVG(0.2533821) Predicted AVG(0.2698214) Difference:-0.01364408
+2. 1990 Mets:   Observed AVG(0.2561773) Predicted AVG(0.2698214) Difference:-0.01364408
 3. 1985 White Sox: Observed AVG(0.2533821) Predicted AVG(0.2665708) Difference:-0.01318867  
 4. 1982 A's:    Observed AVG(0.2360499) Predicted AVG(0.2491338) Difference:-0.01308389
 5. 2002 Indians:Observed AVG(0.2487553) Predicted AVG(0.2617859) Difference: -0.01303057
@@ -186,6 +188,8 @@ newdata[180,]
 ```{r}
 summary(model)
 ```
+
+
 
 Statistically Significant Predictors:
 Runs: More Runs -> Higher Batting Average
@@ -196,6 +200,86 @@ SB: More Stolen Bases -> Lower Batting Average
 RA: More runs given up -> Lower Batting Average
 ERA: Higher ERA -> Higher Batting Average
 attendance: More fans -> Higher Batting Average
+
+
+
+Random Forest
+```{r}
+
+set.seed(541)  # Set a seed for reproducibility
+
+# Determine the number of rows for the training set
+
+nTotal <- nrow(teamspredicting_clean)
+nTrain <- 712
+nTest<-nTotal-nTrain
+# Generate random indices for the training set
+train <- sample(nTotal, nTrain)
+
+# Create the training set and test set based on the indices
+trainData <- teamspredicting_clean[train, ]
+testData <- teamspredicting_clean[-train, ]
+
+
+ctrl <- trainControl(
+  method = "cv",    # Cross-validation method ("cv" for k-fold)
+  number = 5,       # Number of folds
+  verboseIter = TRUE # Show progress during training
+)
+
+
+model <- train(
+  AVG ~ .,             # Formula for your model
+  data = trainData,  # Training data
+  method = "rf",    # Random Forest method
+  trControl = ctrl  # Cross-validation control
+)
+
+
+print(model)
+
+
+pred <- predict(model, newdata = testData)
+
+
+## testing
+pred<-predict(model, newdata<-teamspredicting_clean[-train,])# makes prediction (applies model) on just testing data
+
+
+diff<-teamspredicting_clean$AVG[-train]-pred
+
+sd(diff)
+
+error<-sqrt(sum(diff**2)/nTest)
+
+cat(sprintf('nTrain=%d, nTest=%d, error=%f\n', nTrain, nTest, error))
+
+
+varImp(model)
+```
+
+
+One Standard Deviation Rule
+
+```{r}
+
+
+rmse_linear <- 0.004752
+rmse_rf <- 0.006043
+
+rmse_sd <- sd(c(rmse_linear, rmse_rf))
+upper_bound <- rmse_linear + rmse_sd
+lower_bound <- rmse_linear - rmse_sd
+
+
+if (rmse_rf <= upper_bound && rmse_rf >= lower_bound) {
+  cat("Random Forest Model is within one standard deviation of the Linear Model.\n")
+} else if (rmse_linear <= upper_bound && rmse_linear >= lower_bound) {
+  cat("Linear Model is within one standard deviation of the Random Forest Model.\n")
+} else {
+  cat("Neither model is within one standard deviation of the other.\n")
+}
+```
 
 
 
@@ -234,7 +318,7 @@ error<-sqrt(sum(diff**2)/nTest)
 
 cat(sprintf('nTrain=%d, nTest=%d, error=%f\n', nTrain, nTest, error))
 
-vif(model)
+
 ```
 
 
