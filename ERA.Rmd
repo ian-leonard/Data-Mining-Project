@@ -13,6 +13,8 @@ library(tidyverse)
 library(dplyr)
 library(ggplot2)
 library(caret)
+library(car)
+library(randomForest)
 
 
 teams <- read.csv("Teams.csv")
@@ -84,13 +86,14 @@ teams[which(is.na(teams==TRUE)),]
 
 
 Predic_ERA <- teams
+Predic_ERA_RF <- teams
 
 
 
 ```
 
 
-Model Construction
+Model Construction-Linear Model
 ```{r}
 
 nTotal<- nrow(Predic_ERA)
@@ -118,8 +121,6 @@ pred<-predict(model, newdata <-Predic_ERA[-train,])# makes prediction (applies m
 
 
 
-
-
 diff<-Predic_ERA$ERA[-train]-pred
 
 error<-sqrt(sum(diff**2)/nTest)
@@ -139,6 +140,7 @@ newdata[200,]
 
 
 extracted_rows <- teams[rownames(newdata), ]
+
 
 
 ```
@@ -174,8 +176,6 @@ Biggest Misses
 
 extracted_rows <- Team_Full_Data[rownames(newdata), ]
 order(abs(diff),decreasing=TRUE)
-
-#83, 104, 142, 124, 107
 
 #1994 Minnesota Twin
 extracted_rows[83,]
@@ -223,11 +223,11 @@ Potential Reason for large miss of the 1998 KC Royals
 - Royals Record only 65 wins, the MLB median number of wins was 79.5. Teams with more wins tend to have lower ERAs 
 
 
-Potential Reason for large miss of the 2005 Diamondback
+Potential Reason for large miss of the 2005 Diamondbacks
 - Ended the season 25th in Era (Had the 25th highest ERA in MLB)
 - Diamondbacks pitcher Brandon Webb won the Cy Young Award in 2005.
 -The average ERA of past Cy Young Winners is 2.48, Brandon Webb won the award with an ERA of 3.10
-- Diamondbacks hired a new manager at the start of the seaosn  
+- Diamondbacks hired a new manager at the start of the season  
 
 
 Potential Reason for large miss of 2001 NY Mets
@@ -240,5 +240,88 @@ Potential Reason for large miss of the 1998 Philadelphia Phillies
  - First year in new ball park, which is extremely hitters friendly
  - Team had many offensive stars such as Scott Rolen 
  - Star pitchers such as Curt Schillings had a poor preformences in the new park 
+
+
+Random Forrest Model 
+```{r}
+
+# Split the data into training and testing sets
+
+set.seed(542)  # Set a seed for reproducibility
+
+# Determine the number of rows for the training set
+
+nTotal <- nrow(Predic_ERA_RF)
+nTrain <- 712
+nTest<-nTotal-nTrain
+# Generate random indices for the training set
+train <- sample(nTotal, nTrain)
+
+# Create the training set and test set based on the indices
+trainData <- Predic_ERA_RF[train, ]
+testData <- Predic_ERA_RF[-train, ]
+
+
+ctrl <- trainControl(
+  method = "cv",    # Cross-validation method ("cv" for k-fold)
+  number = 5,       # Number of folds
+  verboseIter = TRUE # Show progress during training
+)
+
+
+model_rf <- train(
+  ERA ~ .,             # Formula for your model
+  data = trainData,  # Training data
+  method = "rf",    # Random Forest method
+  trControl = ctrl  # Cross-validation control
+)
+
+
+print(model_rf)
+
+
+pred <- predict(model_rf, newdata = testData)
+
+
+## testing
+pred<-predict(model_rf, newdata<-Predic_ERA_RF[-train,])# makes prediction (applies model) on just testing data
+
+
+diff_rf<- Predic_ERA_RF$ERA[-train]-pred
+
+sd(diff_rf)
+
+error<-sqrt(sum(diff_rf**2)/nTest)
+
+cat(sprintf('nTrain=%d, nTest=%d, error=%f\n', nTrain, nTest, error))
+
+
+varImp(model_rf)
+```
+
+
+One Standard Deviation Rule
+
+```{r}
+
+
+rmse_linear <- 0.212058
+rmse_rf <- 0.268590
+
+rmse_sd <- sd(c(rmse_linear, rmse_rf))
+upper_bound <- rmse_linear + rmse_sd
+lower_bound <- rmse_linear - rmse_sd
+
+
+if (rmse_rf <= upper_bound && rmse_rf >= lower_bound) {
+  cat("Random Forest Model is within one standard deviation of the Linear Model.\n")
+} else if (rmse_linear <= upper_bound && rmse_linear >= lower_bound) {
+  cat("Linear Model is within one standard deviation of the Random Forest Model.\n")
+} else {
+  cat("Neither model is within one standard deviation of the other.\n")
+}
+```
+
+
 
 
